@@ -2,10 +2,6 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
-@app.get('/')
-async def first_api():
-  return {"message": "Hello, World!"}
-
 BOOKS = [
     {"title": "Title One", "author": "Author One", "category": "science"},
     {"title": "Title Two", "author": "Author Two", "category": "science"},
@@ -31,7 +27,7 @@ async def read_all_books(book_title: str):
             return book
 
 
-@app.get("/books/{book_author}")
+@app.get("/books/{category}/")
 async def read_category_by_query(book_author: str, category: str):
     books_found = []
     for book in BOOKS:
@@ -40,4 +36,5 @@ async def read_category_by_query(book_author: str, category: str):
             and book.get("category").casefold() == category.casefold()
         ):
             books_found.append(book)
+    return books_found
 

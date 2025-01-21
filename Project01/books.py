@@ -39,6 +39,20 @@ async def read_category_by_query(book_author: str, category: str):
     return books_found
 
 
+@app.get("/books/author/{book_author}")
+async def get_author_books(author_name: str):
+    author_books = [
+        book
+        for book in BOOKS
+        if book.get("author").casefold() == author_name.casefold()
+    ]
+
+    if author_books:
+        return author_books
+    else:
+        return {"message": f"No books found by {author_name}"}
+
+
 @app.post("/books/create_book")
 async def create_book(new_book=Body()):
     BOOKS.append(new_book)

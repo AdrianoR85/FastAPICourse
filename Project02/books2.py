@@ -82,3 +82,19 @@ async def create_book(book_request: BookRequest):
 def find_book_id(book: Book):
     book.id = 1 if len(BOOKS) == 0 else BOOKS[-1].id + 1
     return book
+
+
+@app.put("/books/update_book")
+async def update_book(book: BookRequest):
+  for book_index, existing_book in enumerate(BOOKS):
+    if existing_book.id == book.id:
+      BOOKS[book_index] = book
+      return {"message": f"Book with id {book.id} updated successfully"}
+
+@app.delete("/books/{book_id}")
+async def delete_book(book_id: int):
+  for book_index, existing_book in enumerate(BOOKS):
+    if existing_book.id == book_id:
+      del BOOKS[book_index]
+      return {"message": f"Book with id {book_id} deleted successfully"}
+  

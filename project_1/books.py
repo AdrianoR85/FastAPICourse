@@ -23,3 +23,21 @@ async def read_book_by_title(book_title: str):
       return book
     
   return {"Failed": "Title not Found"}
+
+@app.get("/books/")
+async def read_category_query(book_category: str):
+  book_list = []
+
+  for book in BOOKS:
+    category = book.get("category")
+
+    if not category:
+      return {"Error": "The category is required."}
+    
+    if category.casefold() == book_category:
+      book_list.append(book)
+
+  if book_list:
+    return book_list
+  else:
+    return {"Not Found": "No book were found." }    

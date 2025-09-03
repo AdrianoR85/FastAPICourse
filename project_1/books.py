@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import Body, FastAPI
 
 BOOKS = [
     {"title": "Title One", "author": "Author One", "category": "science"},
@@ -11,12 +11,16 @@ BOOKS = [
 
 app = FastAPI()
 
+
+#GET HTTP Methods
+""" It is used by clients,such as web browserr, to retrieve informarion from a server."""
+
 @app.get("/books")
-async def read_all_books():
+async def read_all_books() -> list:
   return BOOKS
 
 @app.get("/books/{book_title}")
-async def read_book_by_title(book_title: str):
+async def read_book_by_title(book_title: str) -> dict:
   for book in BOOKS: 
     title = book.get("title")
     if title and title.casefold() == book_title.casefold():
@@ -24,9 +28,8 @@ async def read_book_by_title(book_title: str):
     
   return {"Failed": "Title not Found"}
 
-
 @app.get("/books/")
-async def read_category_query(book_category: str):
+async def read_category_query(book_category: str) -> list | dict:
   book_list = []
 
   for book in BOOKS:
@@ -62,3 +65,10 @@ async def read_author_category_by_query(book_author: str, book_category: str) ->
   else:
     return {"Not Found": "No book were found." }  
   
+
+# POST HTTP Methods
+"""It is used to send data to a server to create anew resource or submit data for processing."""
+
+@app.post("/books/craete_book")
+async def create_book(new_book=Body()):
+  BOOKS.append(new_book)

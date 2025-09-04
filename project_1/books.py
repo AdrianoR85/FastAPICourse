@@ -72,3 +72,21 @@ async def read_author_category_by_query(book_author: str, book_category: str) ->
 @app.post("/books/craete_book")
 async def create_book(new_book=Body()):
   BOOKS.append(new_book)
+
+
+# PUT HTTP Method
+"""It is used to update an existing resource or create a new one if it doesn't exist at the specified URI. This method is idempotent, meaning that multiple identical PUT requests will gave the same effect as a single one."""
+@app.put("/books/update_book")
+async def update_book(update_book=Body()):
+  for i in range(len(BOOKS)):
+    title = BOOKS[i].get("title")
+    update_title = update_book.get("title")
+
+
+    if not title or not update_title:
+      return {"Error": "Title not found"}
+     
+    if title.casefold() == update_title.casefold():
+      BOOKS[i] = update_book
+  
+  

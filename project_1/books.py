@@ -89,4 +89,20 @@ async def update_book(update_book=Body()):
     if title.casefold() == update_title.casefold():
       BOOKS[i] = update_book
   
+
+# DELETE HTTP Method
+"""It us used to define a path operation for handling requests that aim to remove resources or data from a server."""
+
+@app.delete("/books/delete_book/{book_title}")
+async def delete_book(book_title:str):
+  for i in range(len(BOOKS)):
+    title = BOOKS[i].get("title")
+
+    if not title:
+      return {"Error": "Title is None or empty"}
+    
+    if title.casefold() == book_title.casefold():
+      BOOKS.pop(i)
+      return {"Succefull": f"Book {title} has been deleted"}
   
+  return {"Not Found": "Book cannot be found"}

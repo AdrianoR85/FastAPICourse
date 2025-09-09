@@ -42,11 +42,11 @@ books = [
         4
     ),
     Book(
-        7,
-        "The Hobbit",
-        "J.R.R. Tolkien",
-        "A fantasy adventure of Bilbo Baggins as he joins a quest to reclaim treasure from the dragon Smaug.",
-        5
+        "id": 7,
+        "title": "The Hobbit",
+        "author": "J.R.R. Tolkien",
+        "description": "A fantasy adventure of Bilbo Baggins as he joins a quest to reclaim treasure from the dragon Smaug.",
+        "rating": 5
     ),
     Book(
         8,

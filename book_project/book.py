@@ -9,7 +9,7 @@ class Book:
   description: str
   rating: int
 
-  def __init__(self, id, title, author, description, rating) -> None:
+  def __init__(self, id, title, author, description, rating):
     self.id = id
     self.title = title
     self.author = author
@@ -113,3 +113,16 @@ async def create_book(book_request: BookRequest):
 def find_book_id(book:Book):
   book.id = 1 if len(BOOKS) == 0 else BOOKS[-1].id + 1
   return book
+
+@app.put("/books/update_book")
+async def update_book(book: BookRequest):
+  for i in range(len(BOOKS)):
+    if BOOKS[i].id == book.id:
+      BOOKS[i] = book
+
+@app.delete("/books/{book_id}")
+async def delete_book(book_id: int):
+  for i in range(len(BOOKS)):
+    if BOOKS[i].id == book_id:
+      BOOKS.pop(i)
+      break

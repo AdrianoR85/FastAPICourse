@@ -142,7 +142,7 @@ async def update_book(book: BookRequest):
   book_changed = False
   for i in range(len(BOOKS)):
     if BOOKS[i].id == book.id:
-      BOOKS[i] = book
+      BOOKS[i] = book # type: ignore
       book_changed = True
 
   if not book_changed:

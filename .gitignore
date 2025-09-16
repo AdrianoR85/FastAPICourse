@@ -1,3 +1,5 @@
 fastapienv
 /pycache/*
 .vscode
+
+.env

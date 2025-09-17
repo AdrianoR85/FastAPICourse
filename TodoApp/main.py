@@ -5,4 +5,5 @@ import models
 
 app = FastAPI()
 
+print(models.Base.metadata.tables)
 models.Base.metadata.create_all(bind=engine)

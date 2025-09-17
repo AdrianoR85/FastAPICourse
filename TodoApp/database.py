@@ -16,7 +16,6 @@ SQLALCHEMY_DATABASE_URL = (
 )
 
 # Create a database engine (responsible for actual DB connection)
-# For PostgreSQL we don’t need connect_args (it was only required for SQLite)
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
 # Ensure the database exists (create it if it doesn’t)

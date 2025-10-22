@@ -65,7 +65,7 @@ def craete_access_token(username:str, user_id: int, expires_date: timedelta):
   return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITH)
 
 
-async def get_current_token(token: Annotated[str, Depends(oauth2_bearer)]):
+async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
   try:
     payload = jwt.decode(token,SECRET_KEY, algorithms=ALGORITH)
     username: str = payload.get('sub') # type: ignore

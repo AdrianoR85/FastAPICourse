@@ -31,8 +31,8 @@ class TodoRequest(BaseModel):
 
 """Endpoint that queries all todos using that session."""
 @router.get("/", status_code=status.HTTP_200_OK)
-async def read_all(db: db_dependency ): 
-  return db.query(Todos).all() # uns SELECT * FROM todos; and returns a list of all rows in the todos table.
+async def read_all(user: user_dependecy, db: db_dependency ): 
+  return db.query(Todos).filter(Todos.owner_id == user.get("id")).all()  # uns SELECT * FROM todos; and returns a list of all rows in the todos table.
 
 @router.get("/todo/{todo_id}", status_code=status.HTTP_200_OK)
 async def read_todo(db: db_dependency, todo_id: int = Path(gt=0)):

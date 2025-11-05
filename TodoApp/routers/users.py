@@ -53,10 +53,10 @@ async def change_password(
   if user_model is None:
     raise HTTPException(status_code=404, detail="User not found.")
   
-  if not pwd_context.verify(user_verification.password, user_model.hashed_password):
+  if not pwd_context.verify(user_verification.password, user_model.hashed_password): # type: ignore
     raise HTTPException(status_code=401, detail="Current password is incorrect")
   
-  user_model.hashed_password = pwd_context.hash(user_verification.new_password)
+  user_model.hashed_password = pwd_context.hash(user_verification.new_password) # type: ignore
   db.add(user_model)
   db.commit()
 

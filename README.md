@@ -90,9 +90,11 @@ DB_PASSWORD=your_postgres_password
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=todoapp
+SECRET_KEY=your-super-secret-key-change-this-in-production
+ALGORITHM=HS256
 ```
 
-Replace the values with your PostgreSQL credentials.
+Replace the values with your PostgreSQL credentials and generate a strong `SECRET_KEY` using `openssl rand -hex 32`.
 
 ### Step 4: Run the Application
 
@@ -344,8 +346,8 @@ When a user logs in, we give them a **JWT token** that proves their identity.
 from jose import jwt
 from datetime import datetime, timedelta, timezone
 
-SECRET_KEY = "your-secret-key-here"  # Keep this secret!
-ALGORITHM = "HS256"
+SECRET_KEY = os.getenv("SECRET_KEY")  # Keep this secret!
+ALGORITHM = os.getenv("ALGORITHM")
 
 def create_access_token(username: str, user_id: int, role: str, expires_delta: timedelta):
     # Data to encode in the token
@@ -377,13 +379,14 @@ Every protected endpoint checks if the token is valid.
 ```python
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
+from fastapi import HTTPException, status
 
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token')
 
 async def get_current_user(token: str = Depends(oauth2_bearer)):
     try:
         # Decode the token
-        payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         
         # Extract user information
         username: str = payload.get('sub')
@@ -392,12 +395,12 @@ async def get_current_user(token: str = Depends(oauth2_bearer)):
         
         # Check if data exists
         if username is None or user_id is None:
-            raise HTTPException(status_code=401, detail="Could not validate user")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate user")
         
         return {'username': username, 'id': user_id, 'role': user_role}
     
     except JWTError:
-        raise HTTPException(status_code=401, detail="Could not validate user")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate user")
 ```
 
 **How authentication works in endpoints:**
@@ -511,41 +514,617 @@ alembic current
 
 ---
 
-## Common Issues and Solutions
+## Advanced Concepts Explained
 
-### Problem: "Database does not exist"
-**Solution**: The application automatically creates the database if it doesn't exist. Make sure PostgreSQL is running and your credentials in `.env` are correct.
+### 5. Dependency Injection in FastAPI
 
-### Problem: "Could not validate user"
-**Solution**: Your token might be expired (tokens last 20 minutes). Login again to get a new token.
+**What is Dependency Injection?**
 
-### Problem: "Authentication Failed"
-**Solution**: Make sure you included the token in the Authorization header.
+Dependency Injection is a design pattern where you "inject" (provide) dependencies into functions instead of creating them inside the function. FastAPI makes this very easy with the `Depends()` function.
 
-### Problem: "Alembic can't find models"
-**Solution**: Make sure `alembic/env.py` imports your models correctly: `import models`
+**Example: Database Session Dependency**
 
-## Learning Resources
+```python
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from database import SessionLocal
 
-If you want to learn more about the technologies used:
+def get_db():
+    """Create and manage database sessions."""
+    db = SessionLocal()  # Create a new database session
+    try:
+        yield db  # Provide this session to the endpoint
+    finally:
+        db.close()  # Always close the session when done
 
-- **FastAPI Documentation**: https://fastapi.tiangolo.com/
-- **SQLAlchemy Tutorial**: https://docs.sqlalchemy.org/en/20/tutorial/
-- **JWT Basics**: https://jwt.io/introduction
-- **Alembic Documentation**: https://alembic.sqlalchemy.org/
+# Use the dependency in an endpoint
+@router.get("/")
+async def read_todos(db: Session = Depends(get_db)):
+    return db.query(Todos).all()
+```
 
-## Next Steps
+**Why use `yield` instead of `return`?**
 
-After understanding this project, you can:
-1. Add more fields to the todo model (due date, tags, etc.)
-2. Create a frontend application to use this API
-3. Add email verification for new users
-4. Implement todo sharing between users
-5. Add file attachments to todos
+- `yield` pauses the function and gives control back to the endpoint
+- After the endpoint finishes, the code after `yield` runs (closing the database)
+- This ensures the database connection is always closed, even if an error occurs
 
-## License
+**Example: User Authentication Dependency**
 
-This project is for educational purposes. Feel free to use it to learn and practice.
+```python
+from typing import Annotated
+
+# Create a reusable type annotation
+user_dependency = Annotated[dict, Depends(get_current_user)]
+
+@router.get("/")
+async def read_todos(user: user_dependency, db: Session = Depends(get_db)):
+    # FastAPI automatically calls get_current_user() and get_db()
+    # If authentication fails, the endpoint is never called
+    return db.query(Todos).filter(Todos.owner_id == user['id']).all()
+```
+
+**Benefits of Dependency Injection:**
+
+1. **Code reuse**: Write the logic once, use it everywhere
+2. **Automatic validation**: Dependencies run before the endpoint
+3. **Clean code**: Endpoints focus on business logic, not setup
+4. **Easy testing**: You can replace dependencies with mock versions
+
+---
+
+### 6. Data Validation with Pydantic
+
+**What is Pydantic?**
+
+Pydantic is a library that validates data using Python type hints. FastAPI uses Pydantic to automatically validate request data.
+
+**Example: Todo Request Model**
+
+```python
+from pydantic import BaseModel, Field
+
+class TodoRequest(BaseModel):
+    title: str = Field(min_length=3)
+    description: str = Field(min_length=3, max_length=100)
+    priority: int = Field(gt=0, lt=6)  # gt = greater than, lt = less than
+    complete: bool
+```
+
+**What happens when you use this model?**
+
+```python
+@router.post("/todo")
+async def create_todo(todo_request: TodoRequest):
+    # FastAPI automatically:
+    # 1. Reads the JSON from the request body
+    # 2. Validates each field according to the rules
+    # 3. Converts the data to the correct types
+    # 4. Returns a 422 error if validation fails
+    pass
+```
+
+**Validation rules you can use:**
+
+```python
+from pydantic import BaseModel, Field, EmailStr
+
+class UserRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=20)
+    email: EmailStr  # Must be a valid email format
+    age: int = Field(ge=18, le=120)  # ge = greater or equal, le = less or equal
+    password: str = Field(min_length=8)
+    website: str | None = None  # Optional field
+```
+
+**Converting Pydantic models to dictionaries:**
+
+```python
+todo_request = TodoRequest(
+    title="Buy milk",
+    description="From the store",
+    priority=3,
+    complete=False
+)
+
+# Convert to dictionary
+todo_dict = todo_request.model_dump()
+# Result: {'title': 'Buy milk', 'description': 'From the store', ...}
+
+# Use with SQLAlchemy models
+todo_model = Todos(**todo_dict, owner_id=1)
+```
+
+---
+
+### 7. Error Handling and HTTP Status Codes
+
+**HTTP Status Codes Used in This Project:**
+
+| Code | Meaning | When to Use |
+|------|---------|-------------|
+| 200 | OK | Successful GET request |
+| 201 | Created | Successfully created a resource |
+| 204 | No Content | Successful DELETE or UPDATE (no data returned) |
+| 400 | Bad Request | Invalid data format |
+| 401 | Unauthorized | Missing or invalid authentication |
+| 403 | Forbidden | User doesn't have permission |
+| 404 | Not Found | Resource doesn't exist |
+| 422 | Unprocessable Entity | Validation error |
+| 500 | Internal Server Error | Server error |
+
+**Raising HTTP Exceptions:**
+
+```python
+from fastapi import HTTPException, status
+
+@router.get("/todo/{todo_id}")
+async def read_todo(todo_id: int, db: Session = Depends(get_db)):
+    todo = db.query(Todos).filter(Todos.id == todo_id).first()
+    
+    if todo is None:
+        # Raise an exception with a custom message
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Todo not found."
+        )
+    
+    return todo
+```
+
+**Custom Error Responses:**
+
+```python
+# You can return detailed error information
+raise HTTPException(
+    status_code=400,
+    detail={
+        "error": "Invalid priority",
+        "message": "Priority must be between 1 and 5",
+        "received": priority
+    }
+)
+```
+
+---
+
+### 8. Database Operations (CRUD)
+
+**CRUD** stands for Create, Read, Update, Delete - the four basic operations for any database.
+
+**Create (INSERT):**
+
+```python
+@router.post("/todo")
+async def create_todo(todo_request: TodoRequest, db: Session = Depends(get_db)):
+    # Create a new instance of the model
+    new_todo = Todos(
+        title=todo_request.title,
+        description=todo_request.description,
+        priority=todo_request.priority,
+        complete=todo_request.complete,
+        owner_id=1
+    )
+    
+    # Add to the session (not saved yet)
+    db.add(new_todo)
+    
+    # Save to the database
+    db.commit()
+    
+    # Refresh to get the auto-generated ID
+    db.refresh(new_todo)
+    
+    return new_todo
+```
+
+**Read (SELECT):**
+
+```python
+# Get all todos
+todos = db.query(Todos).all()
+
+# Get one todo by ID
+todo = db.query(Todos).filter(Todos.id == 1).first()
+
+# Get todos with conditions
+todos = db.query(Todos)\
+    .filter(Todos.complete == False)\
+    .filter(Todos.priority > 3)\
+    .all()
+
+# Get with ordering
+todos = db.query(Todos).order_by(Todos.priority.desc()).all()
+
+# Get with limit
+todos = db.query(Todos).limit(10).all()
+```
+
+**Update (UPDATE):**
+
+```python
+@router.put("/todo/{todo_id}")
+async def update_todo(todo_id: int, todo_request: TodoRequest, db: Session = Depends(get_db)):
+    # Find the todo
+    todo = db.query(Todos).filter(Todos.id == todo_id).first()
+    
+    if todo is None:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    
+    # Update the fields
+    todo.title = todo_request.title
+    todo.description = todo_request.description
+    todo.priority = todo_request.priority
+    todo.complete = todo_request.complete
+    
+    # Save changes
+    db.add(todo)
+    db.commit()
+```
+
+**Delete (DELETE):**
+
+```python
+@router.delete("/todo/{todo_id}")
+async def delete_todo(todo_id: int, db: Session = Depends(get_db)):
+    # Find and delete in one query
+    result = db.query(Todos).filter(Todos.id == todo_id).delete()
+    
+    if result == 0:  # No rows were deleted
+        raise HTTPException(status_code=404, detail="Todo not found")
+    
+    db.commit()
+```
+
+---
+
+### 9. API Router Organization
+
+**Why use APIRouter?**
+
+Instead of putting all endpoints in `main.py`, we organize them into separate files using `APIRouter`. This makes the code easier to maintain.
+
+**Creating a router (routers/todos.py):**
+
+```python
+from fastapi import APIRouter
+
+router = APIRouter(
+    prefix="/todos",  # All routes start with /todos
+    tags=["todos"]    # Group in API documentation
+)
+
+@router.get("/")  # Full path: /todos/
+async def get_todos():
+    pass
+
+@router.post("/")  # Full path: /todos/
+async def create_todo():
+    pass
+```
+
+**Including routers in main.py:**
+
+```python
+from fastapi import FastAPI
+from routers import auth, todos, admin, users
+
+app = FastAPI()
+
+# Include all routers
+app.include_router(auth.router)
+app.include_router(todos.router)
+app.include_router(admin.router)
+app.include_router(users.router)
+```
+
+**Benefits:**
+
+- **Separation of concerns**: Each file handles one feature
+- **Team collaboration**: Multiple developers can work on different routers
+- **Easier testing**: Test each router independently
+- **Better documentation**: Routes are grouped logically in the docs
+
+---
+
+### 10. Environment Variables and Security
+
+**Why use environment variables?**
+
+Never hardcode sensitive information (passwords, secret keys) in your code. Use environment variables instead.
+
+**Setting up .env file:**
+
+```env
+# Database credentials
+DB_USERNAME=postgres
+DB_PASSWORD=your_secure_password
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=todoapp
+
+# Security
+SECRET_KEY=your-super-secret-key-change-this-in-production
+ALGORITHM=HS256
+```
+
+**Loading environment variables:**
+
+```python
+from dotenv import load_dotenv
+import os
+
+# Load variables from .env file
+load_dotenv()
+
+# Access variables
+db_username = os.getenv("DB_USERNAME")
+secret_key = os.getenv("SECRET_KEY")
+
+# Provide default values
+debug_mode = os.getenv("DEBUG", "False") == "True"
+```
+
+**Security best practices:**
+
+1. **Never commit .env to Git**: Add `.env` to `.gitignore`
+2. **Use strong SECRET_KEY**: Generate with `openssl rand -hex 32`
+3. **Different keys for production**: Never use development keys in production
+4. **Rotate keys regularly**: Change secret keys periodically
+5. **Use HTTPS in production**: Encrypt data in transit
+
+---
+
+## Development Tips and Best Practices
+
+### Testing Your API
+
+**Using the Interactive Docs:**
+
+1. Go to `http://localhost:8000/docs`
+2. Click on any endpoint to expand it
+3. Click "Try it out"
+4. Fill in the parameters
+5. Click "Execute"
+6. See the response
+
+**Using curl (command line):**
+
+```bash
+# Create a user
+curl -X POST "http://localhost:8000/auth/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com",
+    "first_name": "Test",
+    "last_name": "User",
+    "password": "password123",
+    "role": "user"
+  }'
+
+# Login
+curl -X POST "http://localhost:8000/auth/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=testuser&password=password123"
+
+# Use the token
+curl -X GET "http://localhost:8000/" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+**Using Python requests:**
+
+```python
+import requests
+
+# Login
+response = requests.post(
+    "http://localhost:8000/auth/token",
+    data={"username": "testuser", "password": "password123"}
+)
+token = response.json()["access_token"]
+
+# Get todos
+response = requests.get(
+    "http://localhost:8000/",
+    headers={"Authorization": f"Bearer {token}"}
+)
+todos = response.json()
+```
+
+---
+
+### Common Development Patterns
+
+**Pattern 1: Checking ownership before operations**
+
+```python
+@router.put("/todo/{todo_id}")
+async def update_todo(
+    todo_id: int,
+    todo_request: TodoRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Find the todo and verify ownership in one query
+    todo = db.query(Todos)\
+        .filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id == user['id'])\
+        .first()
+    
+    if todo is None:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    
+    # Update logic here
+```
+
+**Pattern 2: Reusable query functions**
+
+```python
+def get_todo_by_id(db: Session, todo_id: int, user_id: int):
+    """Reusable function to get a todo with ownership check."""
+    return db.query(Todos)\
+        .filter(Todos.id == todo_id)\
+        .filter(Todos.owner_id == user_id)\
+        .first()
+
+@router.get("/todo/{todo_id}")
+async def read_todo(
+    todo_id: int,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    todo = get_todo_by_id(db, todo_id, user['id'])
+    if todo is None:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    return todo
+```
+
+**Pattern 3: Response models**
+
+```python
+from pydantic import BaseModel
+
+class TodoResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    priority: int
+    complete: bool
+    
+    class Config:
+        from_attributes = True  # Allows conversion from SQLAlchemy models
+
+@router.get("/", response_model=list[TodoResponse])
+async def get_todos(db: Session = Depends(get_db)):
+    # FastAPI automatically converts SQLAlchemy models to TodoResponse
+    return db.query(Todos).all()
+```
+
+---
+
+### Debugging Tips
+
+**Enable detailed error messages:**
+
+```python
+# In main.py
+from fastapi import FastAPI
+
+app = FastAPI(debug=True)  # Shows detailed errors (only for development!)
+```
+
+**Add logging:**
+
+```python
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+@router.post("/todo")
+async def create_todo(todo_request: TodoRequest, db: Session = Depends(get_db)):
+    logger.info(f"Creating todo: {todo_request.title}")
+    # Your code here
+    logger.info(f"Todo created successfully")
+```
+
+**Check database queries:**
+
+```python
+# Enable SQLAlchemy query logging
+from sqlalchemy import create_engine
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=True)  # Prints all SQL queries
+```
+
+---
+
+### Performance Tips
+
+**1. Use database indexes:**
+
+```python
+class Todos(Base):
+    __tablename__ = "todos"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, ForeignKey('users.id'), index=True)  # Index for faster queries
+```
+
+**2. Limit query results:**
+
+```python
+# Instead of loading all todos
+todos = db.query(Todos).all()  # Could be thousands of rows
+
+# Use pagination
+todos = db.query(Todos).limit(20).offset(0).all()  # Only 20 rows
+```
+
+**3. Use async database drivers (advanced):**
+
+For better performance with many concurrent users, consider using async database drivers like `asyncpg` with SQLAlchemy's async support.
+
+---
+
+### Project Extension Ideas
+
+Once you understand this project, try adding these features:
+
+**Easy:**
+1. Add a `created_at` timestamp to todos
+2. Add a search endpoint to find todos by title
+3. Add a "mark as complete" endpoint
+4. Add todo categories/tags
+
+**Medium:**
+5. Add pagination to the get all todos endpoint
+6. Add sorting options (by priority, date, etc.)
+7. Add email verification when users register
+8. Add password reset functionality
+9. Add profile pictures for users
+
+**Advanced:**
+10. Add todo sharing between users
+11. Add real-time notifications with WebSockets
+12. Add file attachments to todos
+13. Add a frontend with React or Vue.js
+14. Deploy to a cloud platform (Heroku, AWS, etc.)
+
+---
+
+## Useful Commands Reference
+
+```bash
+# Start the development server
+uvicorn main:app --reload
+
+# Start on a different port
+uvicorn main:app --reload --port 8080
+
+# Create a new Alembic migration
+alembic revision -m "description of change"
+
+# Auto-generate migration from model changes
+alembic revision --autogenerate -m "description"
+
+# Apply migrations
+alembic upgrade head
+
+# Rollback last migration
+alembic downgrade -1
+
+# See migration history
+alembic history
+
+# Install all dependencies
+pip install -r requirements.txt
+
+# Create requirements.txt
+pip freeze > requirements.txt
+```
 
 ---
 

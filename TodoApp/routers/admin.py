@@ -23,17 +23,17 @@ def get_db():
 db_dependency = Annotated[Session, Depends(get_db)]
 user_dependecy = Annotated[dict, Depends(get_current_user)]
 
-@router.get("/Todo", status_code=status.HTTP_200_OK)
+@router.get("/todo", status_code=status.HTTP_200_OK)
 async def read_all(user: user_dependecy, db: db_dependency):
-  if user is None or user.get("role") != "admin":
+  if user is None or user.get("user_role") != "admin":
     raise HTTPException(status_code=401, detail="Authentication Failed")
   
   return db.query(Todos).all()
 
 
-@router.delete("/Todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_todo(user: user_dependecy, db: db_dependency, todo_id: int = Path(gt=0)):
-  if user is None or user.get("role") != "admin":
+  if user is None or user.get("user_role") != "admin":
     raise HTTPException(status_code=401, detail="Authentication Failed")
   
 

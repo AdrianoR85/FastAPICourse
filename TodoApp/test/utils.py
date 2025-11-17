@@ -4,7 +4,8 @@ from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 from ..database import Base
 from ..main import app
-from ..models import Todos
+from ..models import Todos, Users
+from ..routers.auth import pwd_context
 import pytest
 
 
@@ -48,4 +49,25 @@ def test_todo():
   yield todo
   with engine.connect() as connection:
     connection.execute(text('DELETE FROM todos;'))
+    connection.commit()
+
+@pytest.fixture
+def test_user():
+  hashed = pwd_context.hash("testpassword")
+  user = Users( 
+    username='larac', 
+    email='lara@gmail.com', 
+    first_name='Lara', 
+    last_name='Croft',
+    hashed_password=hashed, 
+    role='admin', 
+    phone_number='(111)-111-1111' 
+  )
+
+  db = TestingSessionLocal()
+  db.add(user)
+  db.commit()
+  yield user
+  with engine.connect() as connection:
+    connection.execute(text('DELETE FROM users;'))
     connection.commit()

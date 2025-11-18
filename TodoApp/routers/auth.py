@@ -57,7 +57,7 @@ def authenticate_user(username: str, password: str, db):
   return user
 
 
-def craete_access_token(username:str, user_id: int, role: str, expires_date: timedelta):
+def create_access_token(username:str, user_id: int, role: str, expires_date: timedelta):
   encode = {'sub': username, 'id': user_id, 'role': role}
   expires = expires = datetime.now(timezone.utc) + expires_date + expires_date
 
@@ -74,12 +74,12 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
     user_role: str = payload.get('role') # type: ignore
     if username is None and user_id is None:
       raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
-                          detail="Could not validation user")
+                          detail="Could not validate user")
     
     return {'username': username, 'id': user_id, 'role': user_role}
   except JWTError:
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
-                          detail="Could not validation user")
+                          detail="Could not validate user")
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -110,6 +110,6 @@ async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
                           detail="Could not validation user")
   
-  token = craete_access_token(user.username, user.id, user.role, timedelta(minutes=20)) # type: ignore
+  token = create_access_token(user.username, user.id, user.role, timedelta(minutes=20)) # type: ignore
 
   return {'access_token': token, 'token_type': 'bearer'}  

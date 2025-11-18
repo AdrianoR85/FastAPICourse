@@ -7,7 +7,10 @@ from starlette import status
 from ..models import Todos
 from .auth import get_current_user
 
-router = APIRouter()
+router = APIRouter(
+  prefix='/todos',
+  tags=['todos']
+)
 
 """Dependency that manages DB sessions."""
 def get_db():
